@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,71 @@ import {
   StyleSheet,
   Image,
   SafeAreaView,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
+import Voice from '@react-native-voice/voice';
 
 const App = () => {
   const [messages, setMessages] = useState([]);
   const [isListening, setIsListening] = useState(false);
   const [recognizedText, setRecognizedText] = useState('');
+
+  useEffect(() => {
+    Voice.onSpeechStart = onSpeechStart;
+    Voice.onSpeechEnd = stopListing;
+    Voice.onSpeechResults = onSpeechResults;
+    Voice.onSpeechError = error => console.log('onSpeechError', error);
+
+    const androidPermissionChecking = async () => {
+      if (Platform.OS === 'android') {
+        const hasPermission = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        );
+        console.log(
+          'androidPermissionChecking hasPermission : ',
+          hasPermission,
+        );
+        const getService = await Voice.getSpeechRecognitionServices();
+        console.log('androidPermissionChecking getService: ', getService)
+      }
+    };
+    androidPermissionChecking();
+
+    // for removing all listener
+    return () => {
+      Voice.destroy().then(Voice.removeAllListeners);
+    };
+  }, []);
+
+  // onSpeechStart: jo humay value de ga wo hum 'event' may lay lain gay.
+  const onSpeechStart = event => {
+    console.log('Recording Started...: ', event);
+  };
+  const onSpeechResults = event => {
+    console.log('onSpeachResults event : ', event);
+    const text = event.value[0];
+    setRecognizedText(text);
+  };
+
+  const startListing = async () => {
+    setIsListening(true);
+    try {
+      await Voice.start('en-US');
+    } catch (error) {
+      console.log('Start Listing Error : ', error);
+    }
+  };
+
+  const stopListing = async () => {
+    try {
+      await Voice.stop();
+      Voice.removeAllListeners();
+      setIsListening(false);
+    } catch (error) {
+      console.log('StopListing Error : ', error);
+    }
+  };
 
   const sendMessage = () => {
     if (recognizedText) {
@@ -50,7 +109,9 @@ const App = () => {
           onChangeText={text => setRecognizedText(text)}
         />
         <TouchableOpacity
-          onPress={() => setIsListening(!isListening)}
+          onPress={() => {
+            isListening ? stopListing() : startListing();
+          }}
           style={styles.voiceButton}>
           {isListening ? (
             <Text style={styles.voiceButtonText}>•••</Text>
