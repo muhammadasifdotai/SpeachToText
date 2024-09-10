@@ -1,10 +1,10 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   StyleSheet,
   Image,
   SafeAreaView,
@@ -17,6 +17,7 @@ const App = () => {
   const [messages, setMessages] = useState([]);
   const [isListening, setIsListening] = useState(false);
   const [recognizedText, setRecognizedText] = useState('');
+  const flatListRef = useRef(); // Ref for FlatList
 
   useEffect(() => {
     Voice.onSpeechStart = onSpeechStart;
@@ -34,7 +35,7 @@ const App = () => {
           hasPermission,
         );
         const getService = await Voice.getSpeechRecognitionServices();
-        console.log('androidPermissionChecking getService: ', getService)
+        console.log('androidPermissionChecking getService: ', getService);
       }
     };
     androidPermissionChecking();
@@ -45,12 +46,11 @@ const App = () => {
     };
   }, []);
 
-  // onSpeechStart: jo humay value de ga wo hum 'event' may lay lain gay.
   const onSpeechStart = event => {
     console.log('Recording Started...: ', event);
   };
+
   const onSpeechResults = event => {
-    console.log('onSpeachResults event : ', event);
     const text = event.value[0];
     setRecognizedText(text);
   };
@@ -76,31 +76,42 @@ const App = () => {
 
   const sendMessage = () => {
     if (recognizedText) {
-      setMessages([...messages, {text: recognizedText, sender: 'user'}]);
+      setMessages(prevMessages => [
+        ...prevMessages,
+        {text: recognizedText, sender: 'user'},
+      ]);
       setRecognizedText('');
+
+      // Scroll to bottom after new message is added
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({animated: true});
+      }, 100); // Delay to ensure the layout is updated before scrolling
     }
   };
 
   return (
     <View style={styles.container}>
       <SafeAreaView />
-      <ScrollView contentContainerStyle={styles.messagesContainer}>
-        {messages.map((message, index) => (
+      <FlatList
+        ref={flatListRef}
+        data={messages}
+        showsVerticalScrollIndicator={false}
+        keyExtractor={(item, index) => index.toString()}
+        renderItem={({item}) => (
           <View
-            key={index}
             style={[
               styles.messageBubble,
               {
-                alignSelf:
-                  message.sender === 'user' ? 'flex-end' : 'flex-start',
-                backgroundColor:
-                  message.sender === 'user' ? '#BB2525' : '#141E46',
+                alignSelf: item.sender === 'user' ? 'flex-end' : 'flex-start',
+                backgroundColor: item.sender === 'user' ? '#BB2525' : '#141E46',
               },
             ]}>
-            <Text style={styles.messageText}>{message.text}</Text>
+            <Text style={styles.messageText}>{item.text}</Text>
           </View>
-        ))}
-      </ScrollView>
+        )}
+        contentContainerStyle={styles.messagesContainer}
+        onContentSizeChange={() => flatListRef.current.scrollToEnd({animated: true})} // Scroll to bottom when the list size changes
+      />
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
